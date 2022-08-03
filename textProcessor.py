@@ -175,10 +175,10 @@ def delete_paragraph(paragraph):
 
 
 if __name__ == '__main__':
-    characters_with_colors = get_characters_add_colors("Characters_love_trap.txt")
+    characters_with_colors = get_characters_add_colors("Characters_love_trap 27.txt")
     print(characters_with_colors)
 
-    doc_name = "Lyubov_napokaz_1_26"
+    doc_name = "Lyubov_napokaz_1_27"
 
     doc = docx.Document(doc_name + '.docx')
 
