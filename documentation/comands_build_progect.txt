@@ -1,0 +1,1 @@
+pyinstaller --name="RuFilms" --noconsole --onefile --icon=RuFilms.ico appQT.py

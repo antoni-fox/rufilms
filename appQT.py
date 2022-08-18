@@ -1,15 +1,10 @@
 # #!/usr/bin/python
 
-# Написать проверку тектса для вводимых слов Edit area
-# Написать проверку отключение start button при неправильном тексте
-
-
 import sys
-import time
-
 import textProcessor
 import docx
 import copy
+
 
 from PyQt6.QtWidgets import (
     QApplication,
@@ -23,10 +18,9 @@ from PyQt6.QtWidgets import (
     QMainWindow,
 
 )
+from PyQt6 import QtGui
 from PyQt6.QtCore import (
-    QRunnable,
     QThread,
-    pyqtSlot,
     QObject,
     pyqtSignal
 )
@@ -34,8 +28,17 @@ from PyQt6.QtCore import (
 import os
 
 
-class ProcessDocument(QObject):
+basedir = os.path.dirname(__file__)
 
+try:
+    from ctypes import windll  # Only exists on Windows.
+    myappid = 'rusubtitles.com/'
+    windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
+except ImportError:
+    pass
+
+
+class ProcessDocument(QObject):
     progress = pyqtSignal(int)
     started = pyqtSignal()
     finished = pyqtSignal()
@@ -47,11 +50,11 @@ class ProcessDocument(QObject):
         self.final_file_name = final_file_name
 
     def run(self):
-        print("Thread start")
+        #("Thread start")
         self.started.emit()
 
         self.process_files()
-        print("Thread complete")
+        #print("Thread complete")
         self.finished.emit()
 
     def process_files(self):
@@ -62,7 +65,7 @@ class ProcessDocument(QObject):
 
         self.progress.emit(0)
         characters_with_colors = textProcessor.get_characters_add_colors(self.fname_txt)
-        print(characters_with_colors)
+        #(characters_with_colors)
         self.progress.emit(10)
 
         textProcessor.set_color_for_characters(characters_with_colors, table_docx, characters_column=1)
@@ -73,15 +76,21 @@ class ProcessDocument(QObject):
         # create new dict with characters and symbols number
         characters_words_zero = copy.deepcopy(characters_with_colors)
         for actor, characters in characters_words_zero.items():
-           for character, color in characters.items():
-               characters[character] = 0
+            for character, color in characters.items():
+                characters[character] = 0
         # ---
         self.progress.emit(55)
 
+        textProcessor.check_time_code_parameters(table_docx)
+        self.progress.emit(75)
+
         characters_with_number_words = textProcessor.count_character_words(characters_words_zero, table_docx)
-        print(characters_with_number_words)
-        textProcessor.docx_add_counted_characters(doc, characters_with_number_words, characters_with_colors)
+        #print(characters_with_number_words)
+        textProcessor.docx_add_counted_characters(doc, table_docx, characters_with_number_words, characters_with_colors)
         self.progress.emit(90)
+
+        textProcessor.set_size_table_border(table_docx, 4, 'black')
+        self.progress.emit(95)
 
         doc.save(self.final_file_name)
         self.progress.emit(100)
@@ -178,14 +187,14 @@ class Window(QMainWindow):
                              os.path.isfile(os.path.join(self.this_path_name, f))]
             for file in all_dir_files:
                 if final_file_name == file:
-                    print("bad_status")
+                    #print("bad_status")
                     self.information_label.setText("Information: a file with the same name already exists!")
                     self.information_label.setStyleSheet("QLabel {color : red}")
                     self.start_processing_button.setEnabled(False)
                     return None
 
             if (self.fname_docx != None) and (self.fname_txt != None):
-                print("good_status")
+                #print("good_status")
                 self.final_file_name = final_file_name
                 self.information_label.setText('Information: press "Start" button.')
                 self.information_label.setStyleSheet("QLabel {color : green}")
@@ -193,14 +202,12 @@ class Window(QMainWindow):
                 return None
 
             if (self.fname_docx != None) or (self.fname_txt != None):
-                print("middle_status")
+                #("middle_status")
                 self.information_label.setText('Information: choose files')
                 self.information_label.setStyleSheet("QLabel {color : black}")
                 self.start_processing_button.setEnabled(False)
 
     def start_process(self):
-
-        worker = ProcessDocument(self.fname_txt, self.fname_docx, self.final_file_name)
 
         # Step 2: Create a QThread object
         self.thread = QThread()
@@ -215,18 +222,10 @@ class Window(QMainWindow):
 
         self.thread.start()
 
-        # self.thread.finished.connect(
-        #    lambda: self.longRunningBtn.setEnabled(True)
-        # )
-        # self.thread.finished.connect(
-        #    lambda: self.stepLabel.setText("Long-Running Step: 0")
-        # )
-
-
 
     def process_thread_start(self):
         self.information_label.setText('Information: files are processed')
-        self.information_label.setStyleSheet("QLabel {color : yellow}")
+        self.information_label.setStyleSheet("QLabel {color : orange}")
 
         self.start_processing_button.setEnabled(False)
         self.choose_docx_button.setEnabled(False)
@@ -245,12 +244,9 @@ class Window(QMainWindow):
         self.final_file_name_text_editor.setEnabled(True)
 
 
-
-
-
-
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     window = Window()
+    app.setWindowIcon(QtGui.QIcon('D:\\Progects\\rufilms\\RuFilms.ico'))
     window.show()
     sys.exit(app.exec())

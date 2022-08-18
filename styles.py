@@ -45,3 +45,12 @@ def standart_text_bold(run):
     run.font.size = docx.shared.Pt(16)
     run.font.bold = True
     run.font.name = 'Calibri'
+
+def text_highlight_red(run):
+    run_text = run.text
+    run.clear()
+    run.add_text(run_text)
+    run.font.highlight_color = docx.enum.text.WD_COLOR_INDEX.RED
+    run.font.size = docx.shared.Pt(16)
+    run.font.name = 'Calibri'
+    run.font.color.rgb = docx.shared.RGBColor.from_string("000000")

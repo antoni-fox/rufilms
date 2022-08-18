@@ -1,5 +1,3 @@
-import copy
-
 import docx
 import styles
 import re
@@ -12,16 +10,17 @@ def get_characters_add_colors(file_name):
         lines = file.readlines()
         color_number = 0
         for line in lines:
-            data = line.split(':', 2)
-            actor_name = data[0].strip()
-            characters_names = data[1].split(',')
-            data[2] = data[2].strip()
-            color = [int(number) for number in data[2][data[2].find("(") + 1: data[2].find(")")].split(",")]
-            characters[actor_name] = {}
+            if (line and not line.isspace()):
+                data = line.split(':', 2)
+                actor_name = data[0].strip()
+                characters_names = data[1].split(',')
+                data[2] = data[2].strip()
+                color = [int(number) for number in data[2][data[2].find("(") + 1: data[2].find(")")].split(",")]
+                characters[actor_name] = {}
 
-            for name in characters_names:
-                characters[actor_name][name.strip().upper()] = color
-                # characters_colors[name] = styles.COLORS[color_number]
+                for name in characters_names:
+                    characters[actor_name][name.strip().upper()] = color
+                    # characters_colors[name] = styles.COLORS[color_number]
 
     return characters
 
@@ -152,50 +151,73 @@ def count_character_words(characters, table_docx):
     return characters
 
 
-def docx_add_counted_characters(doc, characters_with_number_words, characters_with_colors):
+def docx_add_counted_characters(doc, table_docx, characters_with_number_words, characters_with_colors):
     for actor, characters in characters_with_number_words.items():
         new_paragraph = doc.add_paragraph("")
         paragraph_run = new_paragraph.add_run(actor + " - ")
         styles.characters_style(paragraph_run, list(characters_with_colors[actor].values())[0])
         for character, number_words in characters.items():
             if number_words > 0:
-                run = new_paragraph.add_run(character + " ")
+                run = new_paragraph.add_run(character.capitalize() + " ")
                 styles.characters_style(run, characters_with_colors[actor][character])
                 run = new_paragraph.add_run(str(number_words) + ", ")
                 styles.characters_style(run, [0, 0, 0])
+                table_docx._element.addprevious(new_paragraph._p)
         new_paragraph = doc.add_paragraph("")
         paragraph_run = new_paragraph.add_run(str(sum(list(characters.values()))))
         styles.standart_text(paragraph_run)
+        table_docx._element.addprevious(new_paragraph._p)
+
+
+def set_size_table_border(table_docx, border_size, color):
+    tbl = table_docx._tbl
+    tblPr = tbl.tblPr
+
+    tblBorders = docx.oxml.OxmlElement('w:tblBorders')
+
+    tbl_borders = docx.oxml.OxmlElement('w:tblBorders')
+    w_names = ['top', 'left', 'bottom', 'right', 'insideH', 'insideV']
+    w_params = {'val': 'single', 'sz': str(border_size), 'space': "0", 'color': color}
+    for name in w_names:
+        w_name = docx.oxml.OxmlElement('w:' + name)
+        for param, value in w_params.items():
+            w_name.set(docx.oxml.ns.qn('w:' + param), value)
+        tblBorders.append(w_name)
+
+    tblPr.append(tblBorders)
+    return tblPr
+
+
+def check_time_code_parameters(table_docx):
+    re_minutes_seconds_colon = re.compile("^([0-5]?[0-9]):([0-5]?[0-9])$")
+    # re_ours_minutes_seconds_colon = re.compile("^(2[0-3]|[01]?[0-9]):([0-5]?[0-9]):([0-5]?[0-9])$")
+    current_time_code = None
+    previous_time_code = None
+
+    for i, row in enumerate(table_docx.rows):
+        paragraphs = row.cells[0].paragraphs
+        for paragraph in paragraphs:
+            text = paragraph.text
+
+            if (len(text) > 0) and (text != "\n"):
+                match_result = re.match(re_minutes_seconds_colon, text)
+                if bool(match_result):
+                    minutes, seconds = match_result.group(0).split(':', 1)
+                    current_time_code = int(minutes) * 60 + int(seconds)
+                    if previous_time_code:
+                        difference = current_time_code - previous_time_code
+                        # wrong time
+                        if difference < 0:
+                            for run in paragraph.runs:
+                                styles.text_highlight_red(run)
+                # wrong text format
+                else:
+                    for run in paragraph.runs:
+                        styles.text_highlight_red(run)
+                previous_time_code = current_time_code
 
 
 def delete_paragraph(paragraph):
     p = paragraph._element
     p.getparent().remove(p)
     p._p = p._element = None
-
-
-if __name__ == '__main__':
-    characters_with_colors = get_characters_add_colors("Characters_love_trap 27.txt")
-    print(characters_with_colors)
-
-    doc_name = "Lyubov_napokaz_1_27"
-
-    doc = docx.Document(doc_name + '.docx')
-
-    table_docx = doc.tables[0]
-
-    set_color_for_characters(characters_with_colors, table_docx, characters_column=1)
-    set_colors_for_text(table_docx, text_column=2)
-
-    # create new dict with characters and symbols number
-    characters_words_zero = copy.deepcopy(characters_with_colors)
-    for actor, characters in characters_words_zero.items():
-        for character, color in characters.items():
-            characters[character] = 0
-    # ---
-
-    characters_with_number_words = count_character_words(characters_words_zero, table_docx)
-    print(characters_with_number_words)
-    docx_add_counted_characters(doc, characters_with_number_words, characters_with_colors)
-
-    doc.save(doc_name + "_demo.docx")
